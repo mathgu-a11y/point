@@ -1,0 +1,477 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>좌표평면 형성평가 v2</title>
+<style>
+  :root {
+    --blue:#2563eb; --blue-dark:#1d4ed8; --green:#16a34a; --red:#dc2626;
+    --amber:#d97706; --bg:#eef4ff; --card:#ffffff; --text:#172033; --muted:#64748b;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; font-family:"Pretendard","Noto Sans KR",Arial,sans-serif;
+    background:linear-gradient(135deg,#eef4ff,#f8fbff); color:var(--text);
+  }
+  button { font:inherit; }
+  .app { max-width:1120px; margin:0 auto; padding:22px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  h1 { margin:0; font-size:clamp(25px,4vw,38px); }
+  .sound-btn,.btn {
+    border:0; border-radius:12px; padding:11px 17px; font-weight:800; cursor:pointer;
+    box-shadow:0 6px 14px rgba(15,23,42,.10); transition:.15s transform,.15s opacity;
+  }
+  .btn:hover,.sound-btn:hover { transform:translateY(-1px); }
+  .btn:disabled { opacity:.48; cursor:not-allowed; transform:none; }
+  .primary { background:var(--blue); color:#fff; }
+  .secondary { background:#e8efff; color:#1e40af; }
+  .warning { background:#fff1d6; color:#9a5800; }
+  .danger { background:#fee2e2; color:#991b1b; }
+  .sound-btn { background:#fff; color:#334155; }
+  .panel {
+    background:rgba(255,255,255,.96); border:1px solid #dbe7ff; border-radius:22px;
+    box-shadow:0 18px 50px rgba(30,64,175,.12); padding:22px;
+  }
+  .hidden { display:none !important; }
+  .start-screen { max-width:720px; margin:36px auto; text-align:center; }
+  .rules { text-align:left; background:#f8fbff; border-radius:16px; padding:16px 20px; line-height:1.75; margin:22px 0; }
+  .start-btn { font-size:22px; padding:15px 34px; }
+  #countdownScreen {
+    min-height:500px; display:flex; align-items:center; justify-content:center;
+    font-size:clamp(80px,17vw,180px); font-weight:1000; color:var(--blue);
+    text-shadow:0 12px 30px rgba(37,99,235,.25);
+  }
+  .topbar {
+    display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:14px;
+  }
+  .stat { background:#fff; border-radius:14px; padding:11px; text-align:center; box-shadow:0 5px 18px rgba(15,23,42,.07); }
+  .stat small { display:block; color:var(--muted); font-weight:700; margin-bottom:3px; }
+  .stat strong { font-size:20px; }
+  .timer-low { color:var(--red); animation:pulse .8s infinite alternate; }
+  @keyframes pulse { to { transform:scale(1.08); } }
+  .game-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.75fr); gap:18px; align-items:start; }
+  .canvas-card { position:relative; }
+  canvas {
+    display:block; width:100%; max-width:680px; aspect-ratio:1/1; margin:auto;
+    background:#fff; border:2px solid #cbd5e1; border-radius:16px; cursor:crosshair; touch-action:none;
+  }
+  .disabled-cover {
+    position:absolute; inset:22px; display:flex; align-items:center; justify-content:center;
+    background:rgba(248,250,252,.55); border-radius:16px; font-weight:900; color:#475569;
+  }
+  .side h2 { margin:0 0 6px; }
+  .target {
+    font-size:clamp(38px,6vw,66px); font-weight:1000; color:var(--blue-dark);
+    margin:18px 0 10px; letter-spacing:1px;
+  }
+  .selected { min-height:32px; font-size:20px; font-weight:800; color:#334155; }
+  .actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:14px 0; }
+  .actions .full { grid-column:1/-1; }
+  .message { min-height:58px; border-radius:13px; padding:12px; font-weight:800; line-height:1.45; background:#f8fafc; }
+  .message.ok { background:#dcfce7; color:#166534; }
+  .message.no { background:#fee2e2; color:#991b1b; }
+  .message.info { background:#e0edff; color:#1e40af; }
+  .hint-box { min-height:72px; margin-top:10px; padding:12px; border-radius:13px; background:#fff7df; color:#854d0e; line-height:1.55; }
+  .bonus-pop {
+    position:fixed; left:50%; top:28%; transform:translate(-50%,-50%);
+    font-size:clamp(38px,8vw,78px); font-weight:1000; color:#f59e0b;
+    text-shadow:0 5px 0 #fff, 0 10px 24px rgba(245,158,11,.45);
+    pointer-events:none; animation:bonus 1.1s ease forwards; z-index:50;
+  }
+  @keyframes bonus {
+    0%{opacity:0; transform:translate(-50%,-20%) scale(.5)}
+    25%{opacity:1; transform:translate(-50%,-50%) scale(1.15)}
+    100%{opacity:0; transform:translate(-50%,-90%) scale(1)}
+  }
+  .result { max-width:900px; margin:18px auto; }
+  .result-title { text-align:center; font-size:38px; margin:4px 0 18px; }
+  .score-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:18px; }
+  .score-box { background:#f8fbff; border-radius:14px; padding:14px 8px; text-align:center; }
+  .score-box small { color:var(--muted); display:block; }
+  .score-box strong { font-size:24px; }
+  .final-score { color:var(--blue-dark); }
+  .table-wrap { overflow:auto; border-radius:14px; border:1px solid #dbe3ef; }
+  table { width:100%; border-collapse:collapse; background:#fff; min-width:620px; }
+  th,td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:center; }
+  th { background:#edf4ff; }
+  .footer-actions { text-align:center; margin-top:18px; }
+  .tiny { color:var(--muted); font-size:13px; margin-top:8px; }
+  .flash-correct { animation:flashCorrect .5s; }
+  @keyframes flashCorrect { 50% { box-shadow:0 0 0 10px rgba(34,197,94,.18); } }
+  @media (max-width:820px) {
+    .game-grid { grid-template-columns:1fr; }
+    .topbar { grid-template-columns:repeat(2,1fr); }
+    .topbar .stat:last-child { grid-column:1/-1; }
+    .score-grid { grid-template-columns:repeat(2,1fr); }
+    .score-grid .score-box:last-child { grid-column:1/-1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>📍 좌표평면 형성평가</h1>
+    <button id="soundBtn" class="sound-btn" type="button">🔊 효과음 켜짐</button>
+  </header>
+
+  <section id="startScreen" class="panel start-screen">
+    <h2>준비되면 시작 버튼을 누르세요!</h2>
+    <div class="rules">
+      <b>총 10문제 · 제한 시간 1분 30초</b><br>
+      • 오른쪽에 제시된 좌표를 보고 왼쪽 좌표평면을 클릭합니다.<br>
+      • 클릭한 위치는 가장 가까운 정수 격자점으로 자동 이동합니다.<br>
+      • 기본 점수는 문제당 10점입니다.<br>
+      • 2연속 +5점, 3연속 +10점, 4연속 +15점처럼 보너스가 증가합니다.<br>
+      • 무료 힌트는 감점이 없습니다. 강력 힌트는 문제당 한 번, 5점 감점됩니다.
+    </div>
+    <button id="startBtn" class="btn primary start-btn" type="button">시작하기</button>
+  </section>
+
+  <section id="countdownScreen" class="panel hidden"></section>
+
+  <main id="gameScreen" class="hidden">
+    <div class="topbar">
+      <div class="stat"><small>문제</small><strong id="progress">1 / 10</strong></div>
+      <div class="stat"><small>남은 시간</small><strong id="timer">01:30</strong></div>
+      <div class="stat"><small>현재 점수</small><strong id="score">0점</strong></div>
+      <div class="stat"><small>연속 정답</small><strong id="streak">0회</strong></div>
+      <div class="stat"><small>보너스</small><strong id="bonusScore">0점</strong></div>
+    </div>
+
+    <div class="game-grid">
+      <section id="canvasCard" class="panel canvas-card">
+        <canvas id="plane" width="680" height="680" aria-label="좌표평면"></canvas>
+      </section>
+
+      <aside class="panel side">
+        <h2>다음 점을 찍으세요</h2>
+        <div id="target" class="target">(0, 0)</div>
+        <div id="selected" class="selected">선택한 점: 없음</div>
+
+        <div class="actions">
+          <button id="submitBtn" class="btn primary full" type="button" disabled>정답 확인</button>
+          <button id="hintBtn" class="btn secondary" type="button">💡 무료 힌트</button>
+          <button id="strongHintBtn" class="btn warning" type="button">⭐ 강력 힌트 (-5)</button>
+          <button id="clearBtn" class="btn danger full" type="button">선택 지우기</button>
+        </div>
+
+        <div id="message" class="message info">좌표평면에서 원하는 정수점을 클릭하세요.</div>
+        <div id="hintBox" class="hint-box">힌트가 여기에 표시됩니다.</div>
+        <div class="tiny">강력 힌트는 각 문제에서 한 번만 사용할 수 있습니다.</div>
+      </aside>
+    </div>
+  </main>
+
+  <section id="resultScreen" class="panel result hidden">
+    <h2 id="resultTitle" class="result-title">평가 결과</h2>
+    <div class="score-grid">
+      <div class="score-box"><small>정답 수</small><strong id="rCorrect">0 / 10</strong></div>
+      <div class="score-box"><small>기본 점수</small><strong id="rBase">0점</strong></div>
+      <div class="score-box"><small>연속 보너스</small><strong id="rBonus">0점</strong></div>
+      <div class="score-box"><small>강력 힌트 감점</small><strong id="rPenalty">0점</strong></div>
+      <div class="score-box"><small>최종 점수</small><strong id="rFinal" class="final-score">0점</strong></div>
+    </div>
+    <p id="remainingText" style="text-align:center;font-weight:800"></p>
+    <h3>교사용 풀이 기록</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>문제</th><th>정답</th><th>학생이 찍은 점</th><th>결과</th><th>강력 힌트</th></tr></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+    <div class="footer-actions">
+      <button id="restartBtn" class="btn primary" type="button">새 문제로 다시하기</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const TOTAL = 10, START_SECONDS = 90, MIN = -10, MAX = 10;
+  const canvas = document.getElementById('plane');
+  const ctx = canvas.getContext('2d');
+  const el = id => document.getElementById(id);
+
+  let questions = [], index = 0, selected = null, seconds = START_SECONDS;
+  let timerId = null, running = false, baseScore = 0, bonusScore = 0, penalty = 0;
+  let streak = 0, correctCount = 0, strongUsed = false, records = [], attempts = [];
+  let strongGuide = false, soundOn = true, audioCtx = null;
+
+  function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+  function makeQuestions(){
+    const seen = new Set(), arr = [];
+    while(arr.length < TOTAL){
+      const x = randInt(MIN,MAX), y = randInt(MIN,MAX), key = `${x},${y}`;
+      if(!seen.has(key)){ seen.add(key); arr.push({x,y}); }
+    }
+    return arr;
+  }
+  function fmt(n){ return n < 0 ? `−${Math.abs(n)}` : String(n); }
+  function coordinate(p){ return `(${fmt(p.x)}, ${fmt(p.y)})`; }
+
+  function resetState(){
+    clearInterval(timerId);
+    questions = makeQuestions(); index = 0; selected = null; seconds = START_SECONDS;
+    running = false; baseScore = 0; bonusScore = 0; penalty = 0; streak = 0;
+    correctCount = 0; strongUsed = false; records = []; attempts = []; strongGuide = false;
+    updateStats(); updateQuestion(); drawPlane();
+  }
+
+  function begin(){
+    resetState();
+    el('startScreen').classList.add('hidden');
+    el('resultScreen').classList.add('hidden');
+    el('countdownScreen').classList.remove('hidden');
+    const sequence = ['3','2','1','시작!'];
+    let i = 0;
+    el('countdownScreen').textContent = sequence[i];
+    const cd = setInterval(() => {
+      i++;
+      if(i < sequence.length){
+        el('countdownScreen').textContent = sequence[i];
+        beep(i === sequence.length-1 ? 700 : 440, .11);
+      } else {
+        clearInterval(cd);
+        setTimeout(startGame, 450);
+      }
+    },1000);
+  }
+
+  function startGame(){
+    el('countdownScreen').classList.add('hidden');
+    el('gameScreen').classList.remove('hidden');
+    running = true;
+    timerId = setInterval(() => {
+      seconds--;
+      updateStats();
+      if(seconds <= 0) finish('시간 종료!');
+    },1000);
+  }
+
+  function updateStats(){
+    el('progress').textContent = `${Math.min(index+1,TOTAL)} / ${TOTAL}`;
+    const m = Math.floor(seconds/60), s = seconds%60;
+    el('timer').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    el('timer').classList.toggle('timer-low', seconds <= 15);
+    el('score').textContent = `${baseScore + bonusScore - penalty}점`;
+    el('streak').textContent = `${streak}회`;
+    el('bonusScore').textContent = `${bonusScore}점`;
+  }
+
+  function updateQuestion(){
+    if(index >= TOTAL) return;
+    el('target').textContent = coordinate(questions[index]);
+    el('selected').textContent = '선택한 점: 없음';
+    el('submitBtn').disabled = true;
+    el('strongHintBtn').disabled = false;
+    el('hintBox').textContent = '힌트가 여기에 표시됩니다.';
+    el('message').className = 'message info';
+    el('message').textContent = '좌표평면에서 원하는 정수점을 클릭하세요.';
+    selected = null; strongUsed = false; strongGuide = false; attempts = [];
+    drawPlane();
+  }
+
+  function toCanvasPoint(x,y){
+    const pad = 36, size = canvas.width - pad*2, unit = size/(MAX-MIN);
+    return { px:pad+(x-MIN)*unit, py:pad+(MAX-y)*unit, pad, size, unit };
+  }
+  function drawPlane(){
+    const W=canvas.width,H=canvas.height;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+    const {pad,size,unit}=toCanvasPoint(0,0);
+
+    ctx.lineWidth=1; ctx.strokeStyle='#dbe3ef';
+    for(let n=MIN;n<=MAX;n++){
+      const vx=pad+(n-MIN)*unit, hy=pad+(MAX-n)*unit;
+      ctx.beginPath(); ctx.moveTo(vx,pad); ctx.lineTo(vx,pad+size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad,hy); ctx.lineTo(pad+size,hy); ctx.stroke();
+    }
+
+    const o=toCanvasPoint(0,0);
+    ctx.lineWidth=3; ctx.strokeStyle='#ef4444';
+    ctx.beginPath(); ctx.moveTo(pad,o.py); ctx.lineTo(pad+size,o.py); ctx.stroke();
+    ctx.strokeStyle='#2563eb';
+    ctx.beginPath(); ctx.moveTo(o.px,pad); ctx.lineTo(o.px,pad+size); ctx.stroke();
+
+    ctx.fillStyle='#334155'; ctx.font='13px Arial'; ctx.textAlign='center';
+    for(let n=MIN;n<=MAX;n++){
+      if(n!==0 && n%2===0){
+        const p=toCanvasPoint(n,0); ctx.fillText(String(n),p.px,o.py+18);
+        const q=toCanvasPoint(0,n); ctx.textAlign='right'; ctx.fillText(String(n),o.px-7,q.py+4); ctx.textAlign='center';
+      }
+    }
+    ctx.font='bold 17px Arial'; ctx.fillStyle='#ef4444'; ctx.fillText('x',pad+size+14,o.py+5);
+    ctx.fillStyle='#2563eb'; ctx.fillText('y',o.px+5,pad-12);
+
+    if(strongGuide && running){
+      const t=questions[index], p=toCanvasPoint(t.x,t.y);
+      ctx.save(); ctx.setLineDash([8,7]); ctx.lineWidth=2; ctx.strokeStyle='rgba(245,158,11,.85)';
+      ctx.beginPath(); ctx.moveTo(p.px,pad); ctx.lineTo(p.px,pad+size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad,p.py); ctx.lineTo(pad+size,p.py); ctx.stroke();
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(p.px,p.py,15,0,Math.PI*2); ctx.strokeStyle='#f59e0b'; ctx.lineWidth=4; ctx.stroke();
+    }
+
+    if(selected){
+      const p=toCanvasPoint(selected.x,selected.y);
+      ctx.beginPath(); ctx.arc(p.px,p.py,9,0,Math.PI*2);
+      ctx.fillStyle='#7c3aed'; ctx.fill();
+      ctx.lineWidth=3; ctx.strokeStyle='#fff'; ctx.stroke();
+    }
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if(!running) return;
+    const rect=canvas.getBoundingClientRect();
+    const sx=canvas.width/rect.width, sy=canvas.height/rect.height;
+    const cx=(e.clientX-rect.left)*sx, cy=(e.clientY-rect.top)*sy;
+    const {pad,size,unit}=toCanvasPoint(0,0);
+    let x=Math.round((cx-pad)/unit+MIN);
+    let y=Math.round(MAX-(cy-pad)/unit);
+    x=Math.max(MIN,Math.min(MAX,x)); y=Math.max(MIN,Math.min(MAX,y));
+    selected={x,y}; el('selected').textContent=`선택한 점: ${coordinate(selected)}`;
+    el('submitBtn').disabled=false; drawPlane();
+  });
+
+  function submit(){
+    if(!running || !selected) return;
+    const target=questions[index], isCorrect=selected.x===target.x && selected.y===target.y;
+    attempts.push({...selected});
+    if(isCorrect){
+      correctCount++; baseScore += 10; streak++;
+      const earned = streak >= 2 ? (streak-1)*5 : 0;
+      bonusScore += earned;
+      records.push({
+        no:index+1, target:{...target}, selected:{...selected}, correct:true,
+        strong:strongUsed, attempts:attempts.map(a=>({...a}))
+      });
+      el('message').className='message ok';
+      el('message').textContent=`정답입니다! +10점${earned ? `, 연속 보너스 +${earned}점` : ''}`;
+      beep(760,.13); setTimeout(()=>beep(980,.16),100);
+      if(earned) showBonus(`+${earned} BONUS!`);
+      if(streak===5) showBonus('Excellent!');
+      el('canvasCard').classList.add('flash-correct');
+      setTimeout(()=>el('canvasCard').classList.remove('flash-correct'),500);
+      updateStats();
+      if(index === TOTAL-1){
+        setTimeout(()=>finish(correctCount===TOTAL?'Perfect!':'평가 완료!'),700);
+      } else {
+        index++;
+        setTimeout(updateQuestion,700);
+      }
+    } else {
+      streak=0;
+      el('message').className='message no';
+      el('message').textContent=`${coordinate(selected)}은(는) 정답이 아닙니다. 다시 찍어 보세요!`;
+      beep(190,.18); updateStats();
+    }
+  }
+
+  function freeHint(){
+    if(!running) return;
+    const {x,y}=questions[index];
+    let parts=[];
+    if(x===0) parts.push('x좌표가 0이므로 y축 위에 있습니다.');
+    else parts.push(`x좌표는 ${x>0?'양수이므로 오른쪽':'음수이므로 왼쪽'}으로 ${Math.abs(x)}칸 이동하세요.`);
+    if(y===0) parts.push('y좌표가 0이므로 x축 위에 있습니다.');
+    else parts.push(`y좌표는 ${y>0?'양수이므로 위쪽':'음수이므로 아래쪽'}으로 ${Math.abs(y)}칸 이동하세요.`);
+    el('hintBox').innerHTML=parts.join('<br>');
+  }
+
+  function quadrant(x,y){
+    if(x===0 && y===0) return '원점';
+    if(x===0) return 'y축 위';
+    if(y===0) return 'x축 위';
+    if(x>0&&y>0) return '제1사분면';
+    if(x<0&&y>0) return '제2사분면';
+    if(x<0&&y<0) return '제3사분면';
+    return '제4사분면';
+  }
+
+  function strongHint(){
+    if(!running || strongUsed) return;
+    strongUsed=true; strongGuide=true; penalty+=5;
+    const {x,y}=questions[index];
+    el('strongHintBtn').disabled=true;
+    el('hintBox').innerHTML=
+      `<b>강력 힌트 사용: -5점</b><br>`+
+      `① 원점에서 x=${fmt(x)}까지 ${x>0?'오른쪽':x<0?'왼쪽':'이동하지 않고'} ${Math.abs(x)}칸 이동<br>`+
+      `② 그 위치에서 y=${fmt(y)}까지 ${y>0?'위쪽':y<0?'아래쪽':'이동하지 않고'} ${Math.abs(y)}칸 이동<br>`+
+      `③ 목표점은 <b>${quadrant(x,y)}</b>에 있습니다. 주황색 안내선을 확인하세요.`;
+    updateStats(); drawPlane(); beep(350,.1);
+  }
+
+  function clearSelection(){
+    selected=null; el('selected').textContent='선택한 점: 없음';
+    el('submitBtn').disabled=true; drawPlane();
+  }
+
+  function showBonus(text){
+    const d=document.createElement('div'); d.className='bonus-pop'; d.textContent=text;
+    document.body.appendChild(d); setTimeout(()=>d.remove(),1150);
+  }
+
+  function finish(title){
+    if(!running) return;
+    running=false; clearInterval(timerId);
+    if(index < TOTAL && !records.some(r=>r.no===index+1)){
+      const last=attempts.length?attempts[attempts.length-1]:null;
+      records.push({no:index+1,target:{...questions[index]},selected:last,correct:false,strong:strongUsed,attempts:attempts.map(a=>({...a}))});
+    }
+    for(let i=records.length;i<TOTAL;i++){
+      records.push({no:i+1,target:{...questions[i]},selected:null,correct:false,strong:false,attempts:[]});
+    }
+    el('gameScreen').classList.add('hidden');
+    el('resultScreen').classList.remove('hidden');
+    el('resultTitle').textContent=title;
+    el('rCorrect').textContent=`${correctCount} / ${TOTAL}`;
+    el('rBase').textContent=`${baseScore}점`;
+    el('rBonus').textContent=`+${bonusScore}점`;
+    el('rPenalty').textContent=`−${penalty}점`;
+    el('rFinal').textContent=`${baseScore+bonusScore-penalty}점`;
+    el('remainingText').textContent=`남은 시간: ${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+    const tbody=el('resultBody'); tbody.innerHTML='';
+    records.forEach(r=>{
+      const tr=document.createElement('tr');
+      const student=r.selected?coordinate(r.selected):'미응답';
+      tr.innerHTML=`<td>${r.no}</td><td>${coordinate(r.target)}</td><td>${student}</td>`+
+        `<td>${r.correct?'✅ 정답':'❌ 오답/미응답'}</td><td>${r.strong?'사용 (-5)':'사용 안 함'}</td>`;
+      tbody.appendChild(tr);
+    });
+    if(correctCount===TOTAL){ showBonus('👑 Perfect!'); beep(880,.18); setTimeout(()=>beep(1100,.2),180); }
+  }
+
+  function beep(freq=440,duration=.12){
+    if(!soundOn) return;
+    try{
+      audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+      const osc=audioCtx.createOscillator(), gain=audioCtx.createGain();
+      osc.frequency.value=freq; osc.type='sine';
+      gain.gain.setValueAtTime(.0001,audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.16,audioCtx.currentTime+.01);
+      gain.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+duration);
+      osc.connect(gain).connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime+duration+.02);
+    }catch(e){}
+  }
+
+  el('startBtn').addEventListener('click',begin);
+  el('submitBtn').addEventListener('click',submit);
+  el('hintBtn').addEventListener('click',freeHint);
+  el('strongHintBtn').addEventListener('click',strongHint);
+  el('clearBtn').addEventListener('click',clearSelection);
+  el('restartBtn').addEventListener('click',()=>{
+    el('resultScreen').classList.add('hidden'); el('startScreen').classList.remove('hidden'); resetState();
+  });
+  el('soundBtn').addEventListener('click',()=>{
+    soundOn=!soundOn; el('soundBtn').textContent=soundOn?'🔊 효과음 켜짐':'🔇 효과음 꺼짐';
+    if(soundOn) beep(520,.08);
+  });
+
+  resetState();
+})();
+</script>
+</body>
+</html>
