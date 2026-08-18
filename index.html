@@ -120,11 +120,11 @@
     <h2>준비되면 시작 버튼을 누르세요!</h2>
     <div class="rules">
       <b>총 10문제 · 제한 시간 1분 30초</b><br>
-      • 오른쪽에 제시된 좌표를 보고 왼쪽 좌표평면을 클릭합니다.<br>
+      • 좌표평면의 축 범위는 −8부터 +8까지이며, 문제 좌표는 −5부터 +5까지의 정수입니다.<br>
       • 클릭한 위치는 가장 가까운 정수 격자점으로 자동 이동합니다.<br>
       • 기본 점수는 문제당 10점입니다.<br>
       • 2연속 +5점, 3연속 +10점, 4연속 +15점처럼 보너스가 증가합니다.<br>
-      • 무료 힌트는 감점이 없습니다. 강력 힌트는 문제당 한 번, 5점 감점됩니다.
+      • 처음 2문제는 제1사분면입니다. 두 문제를 모두 첫 시도에 맞히면 이후에는 다른 사분면이 고르게 나옵니다.<br>      • 무료 힌트는 감점이 없습니다. 강력 힌트는 문제당 한 번, 5점 감점됩니다.
     </div>
     <button id="startBtn" class="btn primary start-btn" type="button">시작하기</button>
   </section>
@@ -190,7 +190,7 @@
 <script>
 (() => {
   'use strict';
-  const TOTAL = 10, START_SECONDS = 90, MIN = -10, MAX = 10;
+  const TOTAL = 10, START_SECONDS = 90, MIN = -8, MAX = 8, POINT_MIN = -5, POINT_MAX = 5;
   const canvas = document.getElementById('plane');
   const ctx = canvas.getContext('2d');
   const el = id => document.getElementById(id);
@@ -198,14 +198,41 @@
   let questions = [], index = 0, selected = null, seconds = START_SECONDS;
   let timerId = null, running = false, baseScore = 0, bonusScore = 0, penalty = 0;
   let streak = 0, correctCount = 0, strongUsed = false, records = [], attempts = [];
-  let strongGuide = false, soundOn = true, audioCtx = null;
+  let strongGuide = false, soundOn = true, audioCtx = null, firstTwoClean = true;
 
   function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
-  function makeQuestions(){
-    const seen = new Set(), arr = [];
-    while(arr.length < TOTAL){
-      const x = randInt(MIN,MAX), y = randInt(MIN,MAX), key = `${x},${y}`;
-      if(!seen.has(key)){ seen.add(key); arr.push({x,y}); }
+  function shuffle(arr){
+    for(let i=arr.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+    return arr;
+  }
+  function pointInQuadrant(q, seen){
+    while(true){
+      const ax=randInt(1,POINT_MAX), ay=randInt(1,POINT_MAX);
+      const signs={
+        1:[1,1], 2:[-1,1], 3:[-1,-1], 4:[1,-1]
+      }[q];
+      const p={x:ax*signs[0],y:ay*signs[1]};
+      const key=`${p.x},${p.y}`;
+      if(!seen.has(key)){ seen.add(key); return p; }
+    }
+  }
+  function makeQuestions(extraFirstQuadrantPractice=false){
+    const seen=new Set(), arr=[];
+    // 1~2번은 항상 제1사분면
+    arr.push(pointInQuadrant(1,seen),pointInQuadrant(1,seen));
+
+    if(extraFirstQuadrantPractice){
+      // 앞의 두 문제에서 한 번이라도 틀리면 3~4번도 제1사분면 연습
+      arr.push(pointInQuadrant(1,seen),pointInQuadrant(1,seen));
+      // 남은 6문제는 제2·3·4사분면에서 각각 2문제
+      shuffle([2,2,3,3,4,4]).forEach(q=>arr.push(pointInQuadrant(q,seen)));
+    }else{
+      // 처음 두 문제를 한 번에 맞히면 나머지 사분면을 고르게 출제
+      // 8문제를 제2·3·4사분면에 3·3·2문제씩 무작위 배분
+      shuffle([2,2,2,3,3,3,4,4]).forEach(q=>arr.push(pointInQuadrant(q,seen)));
     }
     return arr;
   }
@@ -214,9 +241,9 @@
 
   function resetState(){
     clearInterval(timerId);
-    questions = makeQuestions(); index = 0; selected = null; seconds = START_SECONDS;
+    questions = makeQuestions(false); index = 0; selected = null; seconds = START_SECONDS;
     running = false; baseScore = 0; bonusScore = 0; penalty = 0; streak = 0;
-    correctCount = 0; strongUsed = false; records = []; attempts = []; strongGuide = false;
+    correctCount = 0; strongUsed = false; records = []; attempts = []; strongGuide = false; firstTwoClean = true;
     updateStats(); updateQuestion(); drawPlane();
   }
 
@@ -359,10 +386,16 @@
       if(index === TOTAL-1){
         setTimeout(()=>finish(correctCount===TOTAL?'Perfect!':'평가 완료!'),700);
       } else {
+        // 첫 2문제를 모두 첫 시도에 맞히지 못했다면 3~4번도 제1사분면 연습으로 교체
+        if(index === 1 && !firstTwoClean){
+          const adapted=makeQuestions(true);
+          questions.splice(2, TOTAL-2, ...adapted.slice(2));
+        }
         index++;
         setTimeout(updateQuestion,700);
       }
     } else {
+      if(index < 2) firstTwoClean=false;
       streak=0;
       el('message').className='message no';
       el('message').textContent=`${coordinate(selected)}은(는) 정답이 아닙니다. 다시 찍어 보세요!`;
